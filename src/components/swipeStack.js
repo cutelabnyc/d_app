@@ -1,4 +1,3 @@
-import { StatusBar } from 'expo-status-bar';
 import React from 'react';
 import { StyleSheet, View, Dimensions, Animated, Image, PanResponder, Text } from 'react-native';
 
@@ -61,7 +60,7 @@ const Nope = ({opacity}) => {
   )
 };
 
-class App extends React.Component {
+class SwipeStack extends React.Component {
 
   constructor() {
     super();
@@ -213,7 +212,7 @@ class App extends React.Component {
   }
 }
 
-export default App;
+export default SwipeStack;
 
 const styles = StyleSheet.create({
   container: {
