@@ -1,8 +1,12 @@
-import React from 'react';
+import React, { useCallback, useContext, useState, useEffect } from 'react';
 import { StyleSheet, View, Dimensions, Animated, Image, PanResponder, Text } from 'react-native';
+import { ProfileContext } from "../contexts/ProfileContext";
 
-const SCREEN_HEIGHT = Dimensions.get('window').height
-const SCREEN_WIDTH = Dimensions.get('window').width
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+const SCREEN_WIDTH = Dimensions.get('window').width;
+
+const API_ROOT = "https://dapp-server.ddns.net/api/getNarwhals";
+const IMG_ROOT = "https://dapp-server.ddns.net/narwhals";
 
 const Like = ({opacity}) => {
   return (
@@ -60,10 +64,12 @@ const Nope = ({opacity}) => {
   )
 };
 
-class SwipeStack extends React.Component {
+class SwipeStackView extends React.Component {
 
-  constructor() {
-    super();
+  static contextType = ProfileContext;
+
+  constructor(props) {
+    super(props);
     this.position = new Animated.ValueXY();
     this.rotate = this.position.x.interpolate({
       inputRange: [-SCREEN_WIDTH / 2, 0, SCREEN_WIDTH / 2],
@@ -97,28 +103,7 @@ class SwipeStack extends React.Component {
       outputRange: [1, 0.8, 1],
       extrapolate: 'clamp'
     });
-    this.state = {
-      currentIndex: 0,
-      profiles: [],
-      profilePage: 1
-    };
-  }
 
-  async fetchProfiles() {
-    const page = this.state.profilePage;
-    const profiles = await (await fetch(`https://picsum.photos/v2/list?page=${page}&limit=10`)).json();
-    this.setState({
-      profiles: this.state.profiles.concat(profiles.map((p) => {
-        return {
-          id: p.id,
-          uri: p.download_url
-        };
-      })),
-      profilePage: page + 1
-    });
-  }
-
-  componentWillMount() {
     this.PanResponder = PanResponder.create({
       onStartShouldSetPanResponder: (evt, gestureState) => true,
       onPanResponderMove: (evt, gestureState) => {
@@ -127,46 +112,45 @@ class SwipeStack extends React.Component {
       onPanResponderRelease: (evt, gestureState) => {
         if (gestureState.dx > 120) {
           Animated.spring(this.position, {
-            toValue: { x: SCREEN_WIDTH + 100, y: gestureState.dy }
+            toValue: { x: SCREEN_WIDTH + 100, y: gestureState.dy },
+            useNativeDriver: false
           }).start(() => {
-            this.setState({ currentIndex: this.state.currentIndex + 1 }, () => {
-              this.position.setValue({ x: 0, y: 0 })
-            });
-            if (this.state.profiles.length - this.state.currentIndex < 5) this.fetchProfiles();
+            props.onSwipe(true);
+            this.position.setValue({ x: 0, y: 0 });
           })
         } else if (gestureState.dx < -120) {
           Animated.spring(this.position, {
-            toValue: { x: -SCREEN_WIDTH - 100, y: gestureState.dy }
+            toValue: { x: -SCREEN_WIDTH - 100, y: gestureState.dy },
+            useNativeDriver: false
           }).start(() => {
-            this.setState({ currentIndex: this.state.currentIndex + 1 }, () => {
-              this.position.setValue({ x: 0, y: 0 })
-            });
-            if (this.state.profiles.length - this.state.currentIndex < 5) this.fetchProfiles();
+            props.onSwipe(false);
+            this.position.setValue({ x: 0, y: 0 });
           })
         } else {
           Animated.spring(this.position, {
              toValue: { x: 0, y: 0 },
+             useNativeDriver: false,
              friction: 4
              }).start()
         }
       }
     });
-
-    this.fetchProfiles();
   }
 
-  renderProfiles = () => {
-    return this.state.profiles.map((item, i) => {
-      if (i < this.state.currentIndex) return null;
+  renderProfiles = (profiles, currentIndex) => {
+    return profiles.map((item, i) => {
+      if (i < currentIndex) return null;
+      if (i > currentIndex + 10) return null;
 
-      const transform = (i == this.state.currentIndex) ?
+      const transform = (i == currentIndex) ?
         this.rotateAndTranslate :
         { scale: this.nextCardScale };
       
-      const opacity = (i == this.state.currentIndex + 1) ?
+      const opacity = (i == currentIndex + 1) ?
         this.nextCardOpacity :
-        (i == this.state.currentIndex ? 1 : 0);
+        (i == currentIndex ? 1 : 0);
 
+        // console.log(`${IMG_ROOT}/${item.id}.jpg`);
 
        return (
          <Animated.View
@@ -174,15 +158,40 @@ class SwipeStack extends React.Component {
             style={
               [transform,
                 { opacity: opacity },
-              { height: SCREEN_HEIGHT - 120, 
+              { height: SCREEN_HEIGHT - 180, 
               width: SCREEN_WIDTH, 
               padding: 10, 
               position: 'absolute' }]
             }
             key={item.id}
          >
-           {i == this.state.currentIndex && <Like opacity={this.likeOpacity}/>}
-           {i == this.state.currentIndex && <Nope opacity={this.nopeOpacity}/>}
+           {i == currentIndex && <Like opacity={this.likeOpacity}/>}
+           {i == currentIndex && <Nope opacity={this.nopeOpacity}/>}
+
+           <Text 
+            style={{
+              position: "absolute",
+              bottom: 70,
+              left: 30,
+              zIndex: 1000,
+              color: "#FFF",
+              fontSize: 32,
+              fontWeight: "800",
+              padding: 10
+            }}
+            >{item.name}</Text>
+           <Text
+            style={{
+              position: "absolute",
+              bottom: 30,
+              left: 30,
+              zIndex: 1000,
+              color: "#FFF",
+              fontSize: 32,
+              fontWeight: "800",
+              padding: 10
+            }}
+          >{item.age}</Text>
            <Image
              style={{
                flex: 1,
@@ -191,7 +200,9 @@ class SwipeStack extends React.Component {
                resizeMode: "cover",
                borderRadius: 20
              }}
-             source={item.uri}
+             source={{
+               uri: `${IMG_ROOT}/${item.id}.jpg`
+             }}
              key={i}
            />
          </Animated.View>
@@ -202,14 +213,75 @@ class SwipeStack extends React.Component {
   render() {
     return (
       <View style={{ flex: 1 }}>
-        <View style={{ height: 60 }} />
+        <View style={{ height: 30 }} />
         <View style={{ flex: 1 }}>
-          { this.renderProfiles() }
+          { this.renderProfiles(this.props.profiles, this.props.currentIndex) }
         </View>
         <View style={{ height: 60 }} />
       </View>
     );
   }
+}
+
+const SwipeStack = () => {
+
+  const { profile } = useContext(ProfileContext);
+  const [ profiles, setProfiles ] = useState([]);
+  const [ profilePage, setProfilePage ] = useState(1);
+  const [ currentIndex, setCurrentIndex ] = useState(0);
+  const [error, setError] = useState(null);
+  const [fetching, setFetching] = useState(false);
+
+  const fetchProfiles = async () => {
+    if (fetching) return;
+    setFetching(true);
+    const resourceURL = `${API_ROOT}?minAge=${profile.minValue + 3}&maxAge=${profile.maxValue + 3}&gender=${profile.gender}`;
+    try {
+      setError(resourceURL);
+      console.log("hey");
+      const newProfilesReq = await fetch(resourceURL);
+      console.log("ho");
+      setError(2);
+      const newProfiles = await newProfilesReq.json();
+      setError(3);
+      setProfiles(oldp =>
+        oldp.concat(newProfiles.map((p) => {
+          return {
+            id: p.id,
+            age: p.age - 3,
+            gender: p.gender,
+            name: p.name
+          };
+        }))
+      );
+      setProfilePage(profilePage + 1);
+    } catch(e) {
+      console.log("heya");
+      setError(e);
+    } finally {
+      setFetching(false);
+    }
+  };
+
+  useEffect(() => {
+    if (profile) {
+      setProfiles([]);
+      setCurrentIndex(0);
+      fetchProfiles();
+    }
+  }, [profile]);
+
+  useEffect(() => {
+    if (profiles.length > 0 && profiles.length - currentIndex < 5) fetchProfiles();
+  }, [profiles, currentIndex])
+
+  const onSwipe = (didLike) => {
+    setCurrentIndex(oldIdx => oldIdx + 1);
+  }
+
+  return (
+    <SwipeStackView profiles={ profiles } currentIndex={ currentIndex } onSwipe={ onSwipe } error={error} />
+  )
 }
 
 export default SwipeStack;

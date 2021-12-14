@@ -9,7 +9,7 @@ module.exports = async function(env, argv) {
                 if (o.use && o.use.loader && o.use.loader.includes('babel-loader')) {
                     o.include = [
                         path.resolve('.'),
-                        path.resolve('node_modules/@ui-kitten/components'),
+                        path.resolve('node_modules/@ptomasroos/react-native-multi-slider'),
                     ]
                 }
             })
@@ -17,3 +17,4 @@ module.exports = async function(env, argv) {
     })
     return config;
 };
+

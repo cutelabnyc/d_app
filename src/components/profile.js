@@ -1,20 +1,7 @@
-import React, { useEffect } from "react";
+import React, { useContext, useState, useEffect } from "react";
 import { StyleSheet, View, Text, StatusBar, Button, FlatList } from 'react-native';
 import MultiSlider from "@ptomasroos/react-native-multi-slider";
-import AsyncStorage from '@react-native-community/async-storage';
-
-const PERSISTENCE_KEY = 'PROFILE_KEY';
-
-const GENDER_DATA = [
-    {
-        id: "m",
-        title: "Male"
-    },
-    {
-        id: "f",
-        title: "Female"
-    }
-];
+import { ProfileContext } from "../contexts/ProfileContext";
 
 const GenderListRow = ({ title, selected, handlePress }) => {
     const color = selected ? '#2222cc' : '#333'
@@ -27,37 +14,34 @@ const GenderListRow = ({ title, selected, handlePress }) => {
 
 function Profile() {
 
-    const [minValue, setMinValue] = React.useState(20);
-    const [maxValue, setMaxValue] = React.useState(30);
-    const [gender, setGender] = React.useState('f');
-    const [isReady, setIsReady] = React.useState(false);
+    const { profile, setProfile } = useContext(ProfileContext);
 
-    const persistData = async () => {
-        const data = { minValue, maxValue, gender };
-        await AsyncStorage.setItem(PERSISTENCE_KEY, JSON.stringify(data));
-    };
+    const minValue = profile ? profile.minValue : 18;
+    const maxValue = profile ? profile.maxValue : 100;
+    const gender = profile ? profile.gender : "f";
 
-    const restoreData = async () => {
-        const rawData = await AsyncStorage.getItem(PERSISTENCE_KEY);
-        const data = JSON.parse(rawData);
-        setMinValue(data.minValue);
-        setMaxValue(data.maxValue);
-        setGender(data.gender);
+    // const renderItem = ({ item }) => {
+    //     return (
+    //         <GenderListRow title={item.title} selected={item.id === gender} handlePress={() => 
+    //             {
+    //                 if (!!profile) {
+    //                     setProfile(Object.assign({}, profile, { gender: item.id }));
+    //                 }
+    //             }}
+    //         />
+    //     );
+    // };
 
-        setIsReady(true);
-    };
-
-    useEffect(() => {
-        if (isReady) persistData();
-    }, [minValue, maxValue, gender, isReady]);
-
-    useEffect(() => {
-        restoreData();
-    }, [])
-
-    const renderItem = ({ item }) => {
-        return (<GenderListRow title={item.title} selected={item.id === gender} handlePress={() => setGender(item.id)}/>);
-    };
+    // const GENDER_DATA = [
+    //     {
+    //         id: "m",
+    //         title: "Male"
+    //     },
+    //     {
+    //         id: "f",
+    //         title: "Female"
+    //     }
+    // ];
 
     return (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -68,8 +52,12 @@ function Profile() {
             <MultiSlider
                 values={[minValue, maxValue]}
                 onValuesChange={(values) => {
-                    setMinValue(values[0]);
-                    setMaxValue(values[1]);
+                    if (!profile) return;
+                    const newProfile = Object.assign({}, profile, {
+                        minValue: values[0],
+                        maxValue: values[1],
+                    });
+                    setProfile(newProfile);
                 }}
                 min={18}
                 max={100}
@@ -79,11 +67,11 @@ function Profile() {
             </View>
 
             <Text>Preferred Gender</Text>
-            <FlatList
+            {/* <FlatList
                 data={GENDER_DATA}
                 renderItem={renderItem}
                 keyExtractor={item => item.id}
-            />
+            /> */}
 
         </View>
     );
